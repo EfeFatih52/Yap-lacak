@@ -1,0 +1,65 @@
+# Gerekli kütüphaneleri yükleyin
+import tensorflow as tf
+from tensorflow.keras import layers, models
+from tensorflow.keras.datasets import cifar10
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Veri kümesini yükleyin
+(x_train, y_train), (x_test, y_test) = cifar10.load_data()
+
+# Verileri ölçeklendirme (0-255 aralýðýný 0-1 aralýðýna çeker)
+x_train, x_test = x_train / 255.0, x_test / 255.0
+
+# Sýnýf isimlerini tanýmlayýn
+class_names = ['Uçak', 'Araba', 'Kuþ', 'Kedi', 'Geyik', 'Köpek', 'Kurbaða', 'At', 'Gemi', 'Kamyon']
+
+# Verilerden birkaç örnek görselleþtirme
+plt.figure(figsize=(10, 10))
+for i in range(16):
+    plt.subplot(4, 4, i+1)
+    plt.xticks([])
+    plt.yticks([])
+    plt.grid(False)
+    plt.imshow(x_train[i])
+    plt.xlabel(class_names[y_train[i][0]])
+plt.show()
+
+# Modeli oluþturma
+model = models.Sequential([
+    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(32, 32, 3)),
+    layers.MaxPooling2D((2, 2)),
+    layers.Conv2D(64, (3, 3), activation='relu'),
+    layers.MaxPooling2D((2, 2)),
+    layers.Conv2D(64, (3, 3), activation='relu'),
+    layers.Flatten(),
+    layers.Dense(64, activation='relu'),
+    layers.Dense(10)
+])
+
+# Modeli derleme
+model.compile(optimizer='adam',
+              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+              metrics=['accuracy'])
+
+# Modeli eðitme
+history = model.fit(x_train, y_train, epochs=10, validation_data=(x_test, y_test))
+
+# Test setindeki performansý deðerlendirme
+test_loss, test_acc = model.evaluate(x_test, y_test, verbose=2)
+print(f"Test doðruluðu: {test_acc:.2f}")
+
+# Örnek bir tahmin yapma
+predictions = model.predict(x_test)
+predicted_labels = np.argmax(predictions, axis=1)
+
+# Ýlk 10 tahmini görselleþtirme
+plt.figure(figsize=(10, 5))
+for i in range(10):
+    plt.subplot(2, 5, i+1)
+    plt.xticks([])
+    plt.yticks([])
+    plt.grid(False)
+    plt.imshow(x_test[i])
+    plt.xlabel(f"Gerçek: {class_names[y_test[i][0]]}\nTahmin: {class_names[predicted_labels[i]]}")
+plt.show()

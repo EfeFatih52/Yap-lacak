@@ -1,0 +1,80 @@
+import cv2
+import face_recognition
+import numpy as np
+import os
+
+# Kayýtlý yüzlerin bulunduðu klasör
+KNOWN_FACES_DIR = "known_faces"
+os.makedirs(KNOWN_FACES_DIR, exist_ok=True)
+
+# Video kaynaðý (webcam)
+video_capture = cv2.VideoCapture(0)
+
+# Kayýtlý yüzler ve adlarý
+known_face_encodings = []
+known_face_names = []
+
+# Kayýtlý yüzleri yükle
+for image_name in os.listdir(KNOWN_FACES_DIR):
+    if image_name.endswith(".jpg") or image_name.endswith(".png"):
+        img_path = os.path.join(KNOWN_FACES_DIR, image_name)
+        img = face_recognition.load_image_file(img_path)
+        img_encoding = face_recognition.face_encodings(img)[0]
+        known_face_encodings.append(img_encoding)
+        known_face_names.append(image_name.split(".")[0])  # Dosya adý kullanýcý adý olarak alýnýr
+
+print("Kayýtlý yüzler baþarýyla yüklendi.")
+
+# Sistem durumu
+login_successful = False
+
+while not login_successful:
+    ret, frame = video_capture.read()
+    if not ret:
+        print("Kamera görüntüsü alýnamadý.")
+        break
+
+    # Görüntüyü küçült ve BGR'den RGB'ye çevir
+    small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+    rgb_small_frame = small_frame[:, :, ::-1]
+
+    # Çerçevedeki yüzleri tespit et
+    face_locations = face_recognition.face_locations(rgb_small_frame)
+    face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
+
+    for face_encoding in face_encodings:
+        # Yüzü kayýtlý yüzlerle karþýlaþtýr
+        matches = face_recognition.compare_faces(known_face_encodings, face_encoding, tolerance=0.6)
+        name = "Tanýmsýz"
+
+        # En yakýn eþleþmeyi bul
+        face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
+        best_match_index = np.argmin(face_distances)
+        if matches[best_match_index]:
+            name = known_face_names[best_match_index]
+
+        # Eðer tanýnan yüz giriþe yetkiliyse
+        if name == "admin":  # Yalnýzca 'admin' giriþ yapabilir
+            print(f"Giriþ baþarýlý! Hoþ geldiniz, {name}.")
+            login_successful = True
+            break
+        else:
+            print(f"Giriþ reddedildi! Tanýnan yüz: {name}")
+
+    # Çerçeveyi ekranda göster
+    for (top, right, bottom, left) in face_locations:
+        top, right, bottom, left = top * 4, right * 4, bottom * 4, left * 4
+        cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
+        cv2.putText(frame, name, (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
+
+    cv2.imshow("Yüz Tanýma", frame)
+
+    # Çýkýþ için 'q' tuþuna basýn
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+if not login_successful:
+    print("Kullanýcý tanýnmadý, giriþ baþarýsýz!")
+
+video_capture.release()
+cv2.destroyAllWindows()
